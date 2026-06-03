@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Local runtime data
+local_data/
+qc_reports/
+
+# User/client files and ad hoc test attachments
+*.xlsx
+*.xls
+*.pptx
+*.ppt
+*.pdf
+*.zip
+
+# Logs
+*.log
+*.out
+*.err
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

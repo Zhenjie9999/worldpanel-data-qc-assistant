@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Worldpanel Data QC Assistant</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Worldpanel Data QC Assistant</h1>
+      <p>Quality control workspace</p>
+    </div>
+    <div class="header-actions">
+      <div id="identityBadge" class="identity-badge">Local mode</div>
+      <button id="logoutButton" class="secondary-button compact-button hidden">Sign out</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <section>
+        <div class="section-label">Projects</div>
+        <button id="newProjectButton" class="primary-button">+ New project</button>
+        <div id="projectList" class="project-list"></div>
+      </section>
+      <section class="sidebar-note">
+        <strong>Supported</strong>
+        <span>.xlsx · .xls · .pptx · .pdf</span>
+        <button id="llmSettingsButton" class="secondary-button">LLM Settings</button>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div id="welcomePanel" class="empty-state">
+        <h2>Select a project</h2>
+        <p>Create a project or open an existing one to run a QC check.</p>
+      </div>
+
+      <div id="projectPanel" class="hidden">
+        <div class="toolbar">
+          <div>
+            <div class="eyebrow">Active project</div>
+            <h2 id="projectTitle"></h2>
+            <div id="projectCategory" class="project-category"></div>
+          </div>
+          <div class="toolbar-actions">
+            <button id="newRuleButton" class="secondary-button">Project rules</button>
+            <button id="newRunButton" class="primary-button">New QC run</button>
+          </div>
+        </div>
+        <div id="ruleSummary" class="rule-summary"></div>
+        <div id="ruleList" class="rule-list"></div>
+        <div id="runList" class="run-list"></div>
+      </div>
+
+      <div id="runPanel" class="hidden">
+        <div class="toolbar">
+          <div>
+            <div class="eyebrow">QC run</div>
+            <h2 id="runTitle"></h2>
+          </div>
+          <div class="toolbar-actions">
+            <button id="backToProject" class="secondary-button">Back</button>
+            <a id="exportExcel" class="secondary-button" href="#">Export Excel</a>
+            <a id="exportPdf" class="secondary-button" href="#">Export PDF</a>
+            <button id="completeRunButton" class="primary-button">Complete QC</button>
+          </div>
+        </div>
+        <div id="metrics" class="metrics"></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="issues">Current File QC</button>
+          <button class="tab" data-tab="changes">Changes vs Previous</button>
+          <button class="tab" data-tab="matches">Source Matching</button>
+          <button class="tab" data-tab="coverage">Coverage</button>
+          <button class="tab" data-tab="ai">AI Logs</button>
+        </div>
+        <div id="tabContent"></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="identityDialog">
+    <form id="identityForm" method="dialog">
+      <h2>Welcome</h2>
+      <p>Enter your details once. QC actions will be recorded locally.</p>
+      <label>Name<input name="name" required></label>
+      <label>Company email<input name="email" type="email" required></label>
+      <button class="primary-button" type="submit">Continue</button>
+    </form>
+  </dialog>
+
+  <dialog id="projectDialog">
+    <form id="projectForm" method="dialog">
+      <h2>New project</h2>
+      <label>Project name<input name="name" required placeholder="Zespri PanelVoice"></label>
+      <label>Category template<select name="categoryTemplate">
+        <option value="general_fmcg">General FMCG</option>
+        <option value="fresh_produce">Fresh produce</option>
+        <option value="beverages">Beverages</option>
+        <option value="dairy">Dairy</option>
+        <option value="personal_care">Personal care</option>
+      </select></label>
+      <div class="dialog-actions">
+        <button class="secondary-button" type="button" data-close-dialog="projectDialog">Cancel</button>
+        <button class="primary-button" type="submit">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="runDialog">
+    <form id="runForm" method="dialog">
+      <h2>New QC run</h2>
+      <p>Upload one project package. Files stay in this local workspace.</p>
+      <label>Files<input id="fileInput" name="files" type="file" multiple accept=".xlsx,.xls,.pptx,.pdf,.ppt" required></label>
+      <label class="toggle-row"><input name="llmLogicReview" type="checkbox" checked> Enable full parsed-content AI review</label>
+      <label class="toggle-row"><input name="externalAi" type="checkbox" checked> Enable Slides OCR for visual-review pages</label>
+      <div class="privacy-note">All parsed text, numbers, table context, and local logic candidates are sent to the configured intranet model in batches. Slides pages marked for visual review are also eligible for OCR. Original Office files are not sent.</div>
+      <div class="dialog-actions">
+        <button class="secondary-button" type="button" data-close-dialog="runDialog">Cancel</button>
+        <button class="primary-button" type="submit">Run QC</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="llmSettingsDialog">
+    <form id="llmSettingsForm" method="dialog">
+      <h2>LLM Settings</h2>
+      <p>Configure the trusted-intranet Chat Completions model used for logic review and Slides OCR.</p>
+      <label>API endpoint<input name="endpoint" type="url" required placeholder="http://internal-host/v1/chat/completions"></label>
+      <label>Model<input name="model" required placeholder="gpt-5.4"></label>
+      <label>API token<input name="token" type="password" placeholder="Leave blank to keep the saved token"></label>
+      <label>Timeout seconds<input name="timeoutSeconds" type="number" min="5" max="300" value="60" required></label>
+      <label class="toggle-row"><input name="enabled" type="checkbox"> Enable LLM adapter</label>
+      <label class="toggle-row"><input name="ocrEnabled" type="checkbox"> Allow Slides review-page screenshots to be sent</label>
+      <div id="llmWarning" class="privacy-note hidden"></div>
+      <div id="llmTestResult" class="test-result"></div>
+      <div class="dialog-actions">
+        <button class="secondary-button" type="button" id="testLlmButton">Test connection</button>
+        <button class="secondary-button" type="button" data-close-dialog="llmSettingsDialog">Cancel</button>
+        <button class="primary-button" type="submit">Save settings</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="ruleDialog">
+    <form id="ruleForm" method="dialog">
+      <h2>Add project rule</h2>
+      <p>Add a text rule for this project. It will run on future QC checks.</p>
+      <label>Rule name<input name="name" required placeholder="Zespri proxy footnote"></label>
+      <label>Rule type<select name="ruleType"><option value="required_text">Must include text</option><option value="forbidden_text">Must not include text</option></select></label>
+      <label>Text<input name="text" required placeholder="Imported Kiwi to proxy Zespri"></label>
+      <label>Severity<select name="severity"><option>High</option><option selected>Medium</option><option>Low</option></select></label>
+      <label>File type<select name="fileType"><option value="pptx">PPTX</option><option value="pdf">PDF</option></select></label>
+      <div class="dialog-actions">
+        <button class="secondary-button" type="button" data-close-dialog="ruleDialog">Cancel</button>
+        <button class="primary-button" type="submit">Add rule</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="completeDialog">
+    <form id="completeForm" method="dialog">
+      <h2>Complete QC</h2>
+      <p>Confirm that the package is ready for delivery and leave a short audit note.</p>
+      <label>Completion note<textarea name="note" required placeholder="Reviewed all flagged pages and resolved open issues."></textarea></label>
+      <div class="dialog-actions">
+        <button class="secondary-button" type="button" data-close-dialog="completeDialog">Cancel</button>
+        <button class="primary-button" type="submit">Confirm completion</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+[Unit]
+Description=Worldpanel Data QC Assistant
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/worldpanel-qc
+EnvironmentFile=/etc/worldpanel-qc.env
+ExecStart=/opt/worldpanel-qc/.venv/bin/python app.py --host 127.0.0.1 --port 8877 --no-browser
+Restart=always
+RestartSec=5
+User=worldpanelqc
+Group=worldpanelqc
+
+[Install]
+WantedBy=multi-user.target

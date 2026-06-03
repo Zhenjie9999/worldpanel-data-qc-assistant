@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · Worldpanel Data QC Assistant</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="login-page">
+  <main class="login-panel">
+    <h1>Worldpanel Data QC Assistant</h1>
+    <p>Enter the shared access password to continue.</p>
+    <form id="loginForm">
+      <label>Access password<input name="password" type="password" autocomplete="current-password" required autofocus></label>
+      <div id="loginError" class="test-result"></div>
+      <button class="primary-button" type="submit">Sign in</button>
+    </form>
+  </main>
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const error = document.getElementById("loginError");
+      error.textContent = "";
+      const password = new FormData(event.target).get("password");
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (response.ok) {
+        window.location.replace("/");
+        return;
+      }
+      error.textContent = response.status === 429
+        ? "Too many attempts. Please wait a few minutes."
+        : "Incorrect access password.";
+    });
+  </script>
+</body>
+</html>
