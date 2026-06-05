@@ -18,7 +18,9 @@ from .db import Database
 from .exports import export_excel_report, export_pdf_summary, render_printable_summary
 from .llm.client import LlmClient
 from .llm.reviewer import LlmReviewer
+from .llm.scope_assistant import ai_scope_questions, fallback_scope_questions
 from .llm.settings import LlmSettingsStore
+from .qc.issue_grouping import group_issues
 from .qc.runner import run_qc
 from .qc.versions import compare_documents, filename_similarity, should_suggest_comparison
 from .parsers import parse_file
@@ -219,6 +221,27 @@ class AppHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/projects/") and path.endswith("/runs"):
             project_id = int(path.split("/")[3])
             return self._create_run(project_id, payload)
+        if path.startswith("/api/projects/") and path.endswith("/scope-assist"):
+            files = [
+                {"file_name": Path(file.get("name", "")).name, "file_type": Path(file.get("name", "")).suffix.lower().lstrip(".")}
+                for file in payload.get("files", [])
+            ]
+            file_overview = {"files": files}
+            review_goal = str(payload.get("review_goal", ""))
+            questions = fallback_scope_questions(file_overview, review_goal)
+            try:
+                settings = self._merged_llm_settings(payload)
+                if settings.get("enabled") and payload.get("use_ai_scope_assist"):
+                    client = LlmClient(
+                        settings["endpoint"],
+                        settings["model"],
+                        settings["token"],
+                        min(settings["timeout_seconds"], 12),
+                    )
+                    questions = ai_scope_questions(client, file_overview, review_goal)
+            except Exception:
+                questions = fallback_scope_questions(file_overview, review_goal)
+            return self._json({"questions": questions})
         if path.startswith("/api/issues/") and path.endswith("/status"):
             issue_id = int(path.split("/")[3])
             db.update_issue_status(issue_id, payload["status"], payload.get("note", ""), int(payload["user_id"]))
@@ -263,7 +286,16 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def _create_run(self, project_id: int, payload: dict):
-        run_id = db.create_run(project_id, int(payload["user_id"]), bool(payload.get("external_ai_enabled", True)))
+        run_id = db.create_run(
+            project_id,
+            int(payload["user_id"]),
+            bool(payload.get("external_ai_enabled", True)),
+            output_language=str(payload.get("output_language") or "zh"),
+            review_goal=str(payload.get("review_goal") or ""),
+            scope_status=str(payload.get("scope_status") or "confirmed"),
+            scope=payload.get("scope") if isinstance(payload.get("scope"), dict) else {},
+            scope_questions=payload.get("scope_questions") if isinstance(payload.get("scope_questions"), list) else [],
+        )
         run_dir = UPLOAD_DIR / str(project_id) / str(run_id)
         run_dir.mkdir(parents=True, exist_ok=True)
         paths = []
@@ -303,6 +335,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 reviewer,
                 run_dir / "visual-review",
                 progress_callback=progress,
+                run_scope=json.loads((db.get_run(run_id) or {}).get("scope_json") or "{}"),
             )
             self._persist_run_result(run_id, project_id, paths, result)
             db.refresh_run_status(run_id)
@@ -377,10 +410,12 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def _run_payload(self, run_id: int) -> dict:
         run = db.get_run(run_id)
+        issues = db.list_issues(run_id)
         return {
             "run": run,
             "files": db.list_run_files(run_id),
-            "issues": db.list_issues(run_id),
+            "issues": issues,
+            "issue_groups": group_issues(issues),
             "coverage": db.list_coverage(run_id),
             "ai_logs": db.list_ai_logs(run_id),
             "changes": db.list_run_changes(run_id),
@@ -412,6 +447,7 @@ class AppHandler(BaseHTTPRequestHandler):
         data = self._run_payload(run_id)
         run = data["run"]
         project = db.get_project(run["project_id"])
+        language = parse_qs(urlparse(self.path).query).get("lang", [run.get("output_language", "zh")])[0]
         path = EXPORT_DIR / f"worldpanel-qc-run-{run_id}.xlsx"
         export_excel_report(
             path,
@@ -424,6 +460,7 @@ class AppHandler(BaseHTTPRequestHandler):
             data["matches"],
             data["version_links"],
             data["completion"],
+            language=language,
         )
         return self._serve_file(path, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
@@ -431,8 +468,9 @@ class AppHandler(BaseHTTPRequestHandler):
         data = self._run_payload(run_id)
         run = data["run"]
         project = db.get_project(run["project_id"])
+        language = parse_qs(urlparse(self.path).query).get("lang", [run.get("output_language", "zh")])[0]
         path = EXPORT_DIR / f"worldpanel-qc-run-{run_id}.pdf"
-        export_pdf_summary(path, project, run, data["issues"], data["coverage"])
+        export_pdf_summary(path, project, run, data["issues"], data["coverage"], language=language)
         return self._serve_file(path, "application/pdf")
 
     def _summary(self, run_id: int):
