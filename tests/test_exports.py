@@ -24,15 +24,33 @@ class ExportTests(unittest.TestCase):
                 wb.sheetnames,
                 [
                     "Summary",
+                    "Issue Summary",
                     "Current File QC",
                     "Changes vs Previous",
-                    "Source Matching",
+                    "Source Matching Concerns",
                     "Coverage",
                     "AI Logs",
                     "Version Links",
                     "QC Completion",
                 ],
             )
+            wb.close()
+
+    def test_excel_export_uses_selected_language_for_sheet_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "report-zh.xlsx"
+            export_excel_report(
+                output,
+                {"name": "Zespri PanelVoice"},
+                {"id": 1, "status": "Needs Review"},
+                [],
+                [],
+                [],
+                language="zh",
+            )
+            wb = load_workbook(output, read_only=True)
+            self.assertIn("摘要", wb.sheetnames)
+            self.assertIn("当前文件QC", wb.sheetnames)
             wb.close()
 
     def test_pdf_summary_is_a_downloadable_pdf(self):

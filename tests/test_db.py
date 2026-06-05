@@ -82,6 +82,32 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual(completed["progress_percent"], 100)
             self.assertEqual(completed["progress_stage"], "Completed")
 
+    def test_run_metadata_scope_and_output_language_are_persisted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "test.sqlite3")
+            db.initialize()
+            user_id = db.upsert_user("Zhen", "zhen@example.com")
+            project_id = db.create_project("Smart scope", user_id)
+
+            run_id = db.create_run(
+                project_id,
+                user_id,
+                external_ai_enabled=True,
+                output_language="bilingual",
+                review_goal="Only check pricing pages",
+                scope_status="confirmed",
+                scope={"mode": "focused", "pages": [3, 4], "focus_metrics": ["price"]},
+                scope_questions=[{"question": "Need cross-check?", "answer": "No"}],
+            )
+
+            run = db.get_run(run_id)
+
+            self.assertEqual(run["output_language"], "bilingual")
+            self.assertEqual(run["review_goal"], "Only check pricing pages")
+            self.assertEqual(run["scope_status"], "confirmed")
+            self.assertIn('"focused"', run["scope_json"])
+            self.assertIn("Need cross-check?", run["scope_questions_json"])
+
     def test_run_processing_failure_is_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "test.sqlite3")

@@ -57,6 +57,11 @@ class Database:
                     project_id INTEGER NOT NULL REFERENCES projects(id),
                     created_by INTEGER NOT NULL REFERENCES users(id),
                     external_ai_enabled INTEGER NOT NULL,
+                    output_language TEXT NOT NULL DEFAULT 'zh',
+                    review_goal TEXT NOT NULL DEFAULT '',
+                    scope_status TEXT NOT NULL DEFAULT 'confirmed',
+                    scope_json TEXT NOT NULL DEFAULT '{}',
+                    scope_questions_json TEXT NOT NULL DEFAULT '[]',
                     status TEXT NOT NULL DEFAULT 'Needs Review',
                     processing_status TEXT NOT NULL DEFAULT 'queued',
                     progress_stage TEXT NOT NULL DEFAULT 'Queued',
@@ -193,6 +198,11 @@ class Database:
             self._ensure_column(conn, "qc_runs", "progress_detail", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(conn, "qc_runs", "estimated_seconds_remaining", "INTEGER")
             self._ensure_column(conn, "qc_runs", "processing_error", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "qc_runs", "output_language", "TEXT NOT NULL DEFAULT 'zh'")
+            self._ensure_column(conn, "qc_runs", "review_goal", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "qc_runs", "scope_status", "TEXT NOT NULL DEFAULT 'confirmed'")
+            self._ensure_column(conn, "qc_runs", "scope_json", "TEXT NOT NULL DEFAULT '{}'")
+            self._ensure_column(conn, "qc_runs", "scope_questions_json", "TEXT NOT NULL DEFAULT '[]'")
 
     @staticmethod
     def _ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
@@ -220,17 +230,45 @@ class Database:
             )
             return int(cur.lastrowid)
 
-    def create_run(self, project_id: int, user_id: int, external_ai_enabled: bool) -> int:
+    def create_run(
+        self,
+        project_id: int,
+        user_id: int,
+        external_ai_enabled: bool,
+        output_language: str = "zh",
+        review_goal: str = "",
+        scope_status: str = "confirmed",
+        scope: dict | None = None,
+        scope_questions: list | None = None,
+    ) -> int:
+        self.initialize()
+        language = str(output_language or "zh").strip().lower()
+        if language not in {"zh", "en", "bilingual"}:
+            language = "zh"
+        status = str(scope_status or "confirmed").strip().lower()
+        if status not in {"draft", "needs_clarification", "confirmed", "skipped"}:
+            status = "confirmed"
         with closing(self.connect()) as conn, conn:
             cur = conn.execute(
                 """
                 INSERT INTO qc_runs(
-                    project_id, created_by, external_ai_enabled, processing_status,
+                    project_id, created_by, external_ai_enabled, output_language,
+                    review_goal, scope_status, scope_json, scope_questions_json, processing_status,
                     progress_stage, progress_percent, progress_detail, created_at
                 )
-                VALUES (?, ?, ?, 'queued', 'Queued', 0, '', ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'Queued', 0, '', ?)
                 """,
-                (project_id, user_id, int(external_ai_enabled), utc_now()),
+                (
+                    project_id,
+                    user_id,
+                    int(external_ai_enabled),
+                    language,
+                    review_goal.strip(),
+                    status,
+                    json.dumps(scope or {}, ensure_ascii=False),
+                    json.dumps(scope_questions or [], ensure_ascii=False),
+                    utc_now(),
+                ),
             )
             return int(cur.lastrowid)
 

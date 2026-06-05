@@ -11,6 +11,9 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from .qc.issue_grouping import group_issues
+from .reporting.localization import label, normalize_language
+
 
 def _append_table(ws, headers: list[str], rows: list[list]) -> None:
     ws.append(headers)
@@ -40,13 +43,15 @@ def export_excel_report(
     matches: list[dict] | None = None,
     version_links: list[dict] | None = None,
     completion: dict | None = None,
+    language: str | None = None,
 ) -> Path:
+    language = normalize_language(language or "en")
     changes = changes or []
     matches = matches or []
     version_links = version_links or []
     wb = Workbook()
     summary = wb.active
-    summary.title = "Summary"
+    summary.title = label("summary_sheet", language)
     summary.append(["Worldpanel Data QC Assistant", "Local QC report"])
     summary.append(["Project", project.get("name", "")])
     summary.append(["Run ID", run.get("id", "")])
@@ -56,10 +61,27 @@ def export_excel_report(
     summary.column_dimensions["A"].width = 24
     summary.column_dimensions["B"].width = 72
 
-    qc = wb.create_sheet("Current File QC")
+    issue_summary = wb.create_sheet(label("issue_summary_sheet", language))
+    _append_table(
+        issue_summary,
+        [label("severity", language), "Category", "Count", "Locations"],
+        [[item["severity"], item["title"], item["count"], " | ".join(item.get("locations", []))] for item in group_issues(issues)],
+    )
+
+    qc = wb.create_sheet(label("current_qc_sheet", language))
     _append_table(
         qc,
-        ["Severity", "Status", "File", "Location", "Rule", "Description", "Evidence", "Recommendation", "Note"],
+        [
+            label("severity", language),
+            label("status", language),
+            label("file", language),
+            label("location", language),
+            label("rule", language),
+            label("description", language),
+            label("evidence", language),
+            label("recommendation", language),
+            label("note", language),
+        ],
         [
             [
                 issue.get("severity", ""),
@@ -79,7 +101,7 @@ def export_excel_report(
     delta = wb.create_sheet("Changes vs Previous")
     _append_table(delta, ["Type", "File", "Location", "Before", "After"], [[c.get("type", ""), c.get("file_name", ""), c.get("location", ""), c.get("before", ""), c.get("after", "")] for c in changes])
 
-    sources = wb.create_sheet("Source Matching")
+    sources = wb.create_sheet(label("source_matching_sheet", language))
     source_rows = []
     for match in matches:
         selected = match.get("selected_candidate_index")
@@ -102,7 +124,7 @@ def export_excel_report(
             )
     _append_table(sources, ["Visible file", "Visible location", "Visible number", "Excel file", "Excel location", "Excel number", "Confidence", "Confirmed source"], source_rows)
 
-    cov = wb.create_sheet("Coverage")
+    cov = wb.create_sheet(label("coverage_sheet", language))
     _append_table(
         cov,
         ["File", "Page", "Coverage %", "Numbers found", "Low confidence", "Review required", "Detail"],
@@ -120,7 +142,7 @@ def export_excel_report(
         ],
     )
 
-    logs = wb.create_sheet("AI Logs")
+    logs = wb.create_sheet(label("ai_logs_sheet", language))
     _append_table(
         logs,
         ["Provider", "File", "Page", "Status", "Detail"],
@@ -146,7 +168,8 @@ def export_excel_report(
     return output
 
 
-def render_printable_summary(project: dict, run: dict, issues: list[dict], coverage: list[dict]) -> str:
+def render_printable_summary(project: dict, run: dict, issues: list[dict], coverage: list[dict], language: str | None = None) -> str:
+    language = normalize_language(language or "en")
     open_high = [i for i in issues if i.get("severity") == "High" and i.get("status", "pending") not in {"fixed", "confirmed_ok"}]
     review_pages = [c for c in coverage if c.get("review_required")]
     issue_rows = "".join(
@@ -165,11 +188,11 @@ def render_printable_summary(project: dict, run: dict, issues: list[dict], cover
 </body></html>"""
 
 
-def export_pdf_summary(output: Path, project: dict, run: dict, issues: list[dict], coverage: list[dict]) -> Path:
+def export_pdf_summary(output: Path, project: dict, run: dict, issues: list[dict], coverage: list[dict], language: str | None = None) -> Path:
     output = Path(output).resolve()
     edge = _find_edge()
     if edge:
-        html = render_printable_summary(project, run, issues, coverage)
+        html = render_printable_summary(project, run, issues, coverage, language)
         output.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=output.parent) as tmp:
             html_path = Path(tmp) / "summary.html"

@@ -5,7 +5,10 @@ import json
 import re
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 
+from worldpanel_qc.cache import JsonCache, stable_hash
+from worldpanel_qc.config import CACHE_DIR
 from .category_templates import category_guidance
 
 
@@ -84,7 +87,20 @@ class LlmClient:
         )
 
     def _chat(self, messages: list[dict]) -> dict:
-        payload = json.dumps({"model": self.model, "messages": messages}, ensure_ascii=False).encode("utf-8")
+        payload_object = {"model": self.model, "messages": messages}
+        cache_key = stable_hash(
+            {
+                "endpoint_host": urlparse(self.endpoint).netloc,
+                "model": self.model,
+                "messages": messages,
+                "prompt_version": "2026-06-05",
+            }
+        )
+        cache = JsonCache(CACHE_DIR)
+        cached = cache.get("llm", cache_key)
+        if cached is not None:
+            return cached
+        payload = json.dumps(payload_object, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
             self.endpoint,
             data=payload,
@@ -95,7 +111,9 @@ class LlmClient:
             with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
                 data = json.load(response)
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            return {"ok": True, "status": "success", "data": _json_content(content), "model": data.get("model", self.model)}
+            result = {"ok": True, "status": "success", "data": _json_content(content), "model": data.get("model", self.model)}
+            cache.set("llm", cache_key, result)
+            return result
         except json.JSONDecodeError:
             return {"ok": False, "status": "invalid_response", "detail": "Model response was not valid JSON."}
         except TimeoutError:

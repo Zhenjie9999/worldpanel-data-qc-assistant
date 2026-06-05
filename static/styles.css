@@ -45,6 +45,10 @@ h2 { font-size: 20px; }
 .rule-list { margin-bottom: 18px; }
 .run-item, .rule-item, .version-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .rule-item, .version-item, .mapping-item { padding: 10px; border: 1px solid var(--line); background: white; }
+.issue-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.issue-group { padding: 10px; border: 1px solid var(--line); border-left: 4px solid var(--accent); background: white; }
+.issue-group strong, .issue-group span, .issue-group small { display: block; }
+.issue-group span, .issue-group small { margin-top: 4px; color: var(--muted); font-size: 12px; }
 .status { font-size: 12px; font-weight: 700; }
 .status-not-ready { color: var(--high); }
 .status-needs-review { color: var(--medium); }

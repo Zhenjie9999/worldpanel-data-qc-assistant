@@ -106,6 +106,49 @@ class WebProgressTests(unittest.TestCase):
             self.assertEqual(polled["run"]["processing_status"], "failed")
             self.assertIn("Synthetic failure", polled["run"]["processing_error"])
 
+    def test_run_creation_persists_scope_metadata_from_payload(self):
+        user_id = web.db.upsert_user("Zhen", "zhen@example.com")
+        project_id = web.db.create_project("Scope metadata", user_id)
+
+        with patch.object(web, "run_qc", return_value={"documents": [], "issues": [], "coverage": [], "ai_logs": [], "matches": []}):
+            created = self.post(
+                f"/api/projects/{project_id}/runs",
+                {
+                    "user_id": user_id,
+                    "external_ai_enabled": False,
+                    "output_language": "en",
+                    "review_goal": "Check only pricing slides",
+                    "scope_status": "confirmed",
+                    "scope": {"mode": "focused", "pages": [2, 3]},
+                    "scope_questions": [{"question": "Cross-check?", "answer": "No"}],
+                    "files": [],
+                },
+            )
+
+        run = created["run"]
+        self.assertEqual(run["output_language"], "en")
+        self.assertEqual(run["review_goal"], "Check only pricing slides")
+        self.assertEqual(run["scope_status"], "confirmed")
+        self.assertIn('"focused"', run["scope_json"])
+
+    def test_scope_assist_returns_boundary_questions(self):
+        user_id = web.db.upsert_user("Zhen", "zhen@example.com")
+        project_id = web.db.create_project("Scope assist", user_id)
+
+        result = self.post(
+            f"/api/projects/{project_id}/scope-assist",
+            {
+                "review_goal": "Check pricing pages",
+                "files": [
+                    {"name": "deck.pptx"},
+                    {"name": "source.xlsx"},
+                ],
+            },
+        )
+
+        self.assertIn("questions", result)
+        self.assertTrue(any("PPT" in item["question"] and "Excel" in item["question"] for item in result["questions"]))
+
 
 if __name__ == "__main__":
     unittest.main()

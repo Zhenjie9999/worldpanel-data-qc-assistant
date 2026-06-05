@@ -116,8 +116,9 @@ async function openRun(runId) {
   $("projectPanel").classList.add("hidden");
   $("runPanel").classList.remove("hidden");
   $("runTitle").textContent = `Run #${runId} / ${state.run.run.status}`;
-  $("exportExcel").href = `/api/runs/${runId}/export.xlsx`;
-  $("exportPdf").href = `/api/runs/${runId}/export.pdf`;
+  const exportLanguage = encodeURIComponent(state.run.run.output_language || "zh");
+  $("exportExcel").href = `/api/runs/${runId}/export.xlsx?lang=${exportLanguage}`;
+  $("exportPdf").href = `/api/runs/${runId}/export.pdf?lang=${exportLanguage}`;
   const processing = ["queued", "processing"].includes(state.run.run.processing_status);
   $("completeRunButton").disabled = processing || Boolean(state.run.completion);
   $("completeRunButton").textContent = state.run.completion ? "QC completed" : "Complete QC";
@@ -206,7 +207,13 @@ function renderTab() {
 
 function renderIssues() {
   if (!state.run.issues.length) return `<div class="empty-state"><p>No issues found by the current rules.</p></div>`;
-  return `<table><thead><tr><th>Severity</th><th>File</th><th>Location</th><th>Issue</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>${state.run.issues.map((issue) => `
+  const groups = (state.run.issue_groups || []).length ? `<div class="issue-groups">${state.run.issue_groups.map((group) => `
+    <div class="issue-group">
+      <strong>${escapeHtml(group.title)}</strong>
+      <span>${escapeHtml(group.severity)} / ${group.count} issue(s)</span>
+      <small>${escapeHtml((group.locations || []).join(" | "))}</small>
+    </div>`).join("")}</div>` : "";
+  return `${groups}<table><thead><tr><th>Severity</th><th>File</th><th>Location</th><th>Issue</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>${state.run.issues.map((issue) => `
     <tr>
       <td class="severity severity-${issue.severity.toLowerCase()}">${escapeHtml(issue.severity)}</td>
       <td>${escapeHtml(issue.file_name)}</td>
@@ -416,9 +423,17 @@ $("runForm").addEventListener("submit", async (event) => {
   const selectedFiles = [...$("fileInput").files];
   const hasSlides = selectedFiles.some((file) => /\.(pptx|ppt|pdf)$/i.test(file.name));
   const hasWorkbook = selectedFiles.some((file) => /\.(xlsx|xls)$/i.test(file.name));
-  if (hasSlides && hasWorkbook && !window.confirm("This upload mixes PPT/PDF and Excel files. Please continue only when they belong to the same report package and need cross-checking.\n\n本次上传同时包含 PPT/PDF 和 Excel。请确认它们属于同一份报告/同一套交付文件，并且确实需要交叉检查。")) {
+  if (hasSlides && hasWorkbook && !window.confirm("This upload mixes PPT/PDF and Excel files. Continue only if they belong to the same report package and need cross-checking.")) {
     return;
   }
+  const assist = await api(`/api/projects/${state.project.id}/scope-assist`, { method: "POST", body: JSON.stringify({
+    review_goal: form.get("reviewGoal"),
+    use_ai_scope_assist: true,
+    files: selectedFiles.map((file) => ({ name: file.name })),
+  }) });
+  const boundaryText = (assist.questions || []).map((item, index) => `${index + 1}. ${item.question}`).join("\n");
+  const boundaryAnswer = boundaryText ? window.prompt(`Please clarify the QC boundary before starting:\n\n${boundaryText}`, form.get("reviewGoal") || "Full check") : "";
+  if (boundaryText && boundaryAnswer === null) return;
   const files = await Promise.all(selectedFiles.map(readFile));
   const submitButton = event.target.querySelector('[type="submit"]');
   submitButton.disabled = true;
@@ -428,6 +443,11 @@ $("runForm").addEventListener("submit", async (event) => {
       user_id: state.user.id,
       llm_logic_review_enabled: Boolean(form.get("llmLogicReview")),
       external_ai_enabled: Boolean(form.get("externalAi")),
+      output_language: form.get("outputLanguage"),
+      review_goal: form.get("reviewGoal"),
+      scope_status: "confirmed",
+      scope: { mode: form.get("scopeMode"), raw_goal: form.get("reviewGoal"), boundary_answer: boundaryAnswer },
+      scope_questions: (assist.questions || []).map((item) => ({ ...item, answer: boundaryAnswer })),
       files,
     }) });
     $("runDialog").close();
@@ -463,3 +483,4 @@ document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click",
 document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => $(button.dataset.closeDialog).close()));
 
 boot();
+
