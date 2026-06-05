@@ -97,6 +97,29 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual(failed["progress_stage"], "AI data review")
             self.assertEqual(failed["processing_error"], "Model timed out")
 
+    def test_category_template_mismatch_issue_is_listed_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "test.sqlite3")
+            db.initialize()
+            user_id = db.upsert_user("Zhen", "zhen@example.com")
+            project_id = db.create_project("Zespri PanelVoice", user_id)
+            run_id = db.create_run(project_id, user_id, external_ai_enabled=True)
+
+            db.add_issue(run_id, {"rule_id": "local_share_total", "severity": "High", "description": "Share total is 92%."})
+            db.add_issue(
+                run_id,
+                {
+                    "rule_id": "llm_category_template_mismatch",
+                    "severity": "Medium",
+                    "description": "Uploaded file content may not match the selected category template.",
+                },
+            )
+
+            issues = db.list_issues(run_id)
+
+            self.assertEqual(issues[0]["rule_id"], "llm_category_template_mismatch")
+            self.assertEqual(issues[1]["rule_id"], "local_share_total")
+
     def test_project_persists_category_template(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "test.sqlite3")

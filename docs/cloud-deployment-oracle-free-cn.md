@@ -74,7 +74,7 @@ sudo nano /etc/worldpanel-qc.env
 
 ```bash
 WORLDPANEL_QC_ACCESS_PASSWORD=共享访问密码
-WORLDPANEL_QC_LLM_ENDPOINT=http://218.241.201.171:28180/jdgpt/v1/chat/completions
+WORLDPANEL_QC_LLM_ENDPOINT=http://your-llm-host/v1/chat/completions
 WORLDPANEL_QC_LLM_MODEL=gpt-5.4
 WORLDPANEL_QC_LLM_TOKEN=模型密钥
 WORLDPANEL_QC_LLM_ENABLED=1

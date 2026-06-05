@@ -48,7 +48,7 @@ Excel / PPTX / PDF 解析
 默认测试配置：
 
 ```text
-API 地址：http://218.241.201.171:28180/jdgpt/v1/chat/completions
+API 地址：http://your-llm-host/v1/chat/completions
 模型名：gpt-5.4
 ```
 

@@ -9,6 +9,8 @@ venv/
 # Local runtime data
 local_data/
 qc_reports/
+.env
+*.env
 
 # User/client files and ad hoc test attachments
 *.xlsx

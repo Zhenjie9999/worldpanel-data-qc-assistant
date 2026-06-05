@@ -82,6 +82,7 @@ label { display: grid; gap: 6px; color: #3e5266; font-size: 13px; font-weight: 6
 .toggle-row { grid-template-columns: 18px 1fr; align-items: center; }
 .toggle-row input { width: 16px; min-height: 16px; }
 .privacy-note { padding: 10px; background: #fff8e7; border: 1px solid #f0d28d; color: #72510b; font-size: 12px; }
+.scope-note { padding: 10px; background: #eef7f8; border: 1px solid #b8dadd; color: #25585e; font-size: 12px; line-height: 1.45; }
 .test-result { min-height: 18px; color: var(--muted); font-size: 12px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .stack { display: grid; gap: 12px; }

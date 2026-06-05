@@ -113,6 +113,10 @@
     <form id="runForm" method="dialog">
       <h2>New QC run</h2>
       <p>Upload one project package. Files stay in this local workspace.</p>
+      <div class="scope-note">
+        Project scope reminder: keep one project to one report/client package. Do not place unrelated PPT, PDF, and Excel files in the same project. If cross-checking is not needed, upload them as separate runs or create a separate project.
+        <br>项目范围提醒：同一个 project 建议只放同一份报告/同一套客户交付文件。不要把无关 PPT、PDF 和 Excel 混在同一个 project 中检查；不需要交叉检查时，请分开上传或新建 project。
+      </div>
       <label>Files<input id="fileInput" name="files" type="file" multiple accept=".xlsx,.xls,.pptx,.pdf,.ppt" required></label>
       <label class="toggle-row"><input name="llmLogicReview" type="checkbox" checked> Enable full parsed-content AI review</label>
       <label class="toggle-row"><input name="externalAi" type="checkbox" checked> Enable Slides OCR for visual-review pages</label>

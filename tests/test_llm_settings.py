@@ -56,7 +56,7 @@ class LlmSettingsTests(unittest.TestCase):
             with patch.dict(
                 "os.environ",
                 {
-                    "WORLDPANEL_QC_LLM_ENDPOINT": "http://218.241.201.171:28180/jdgpt/v1/chat/completions",
+                    "WORLDPANEL_QC_LLM_ENDPOINT": "http://llm.internal/v1/chat/completions",
                     "WORLDPANEL_QC_LLM_MODEL": "gpt-5.4",
                     "WORLDPANEL_QC_LLM_TOKEN": "env-token",
                     "WORLDPANEL_QC_LLM_TIMEOUT_SECONDS": "90",
@@ -68,7 +68,7 @@ class LlmSettingsTests(unittest.TestCase):
                 loaded = store.load()
                 public = store.public_settings()
 
-            self.assertEqual(loaded["endpoint"], "http://218.241.201.171:28180/jdgpt/v1/chat/completions")
+            self.assertEqual(loaded["endpoint"], "http://llm.internal/v1/chat/completions")
             self.assertEqual(loaded["model"], "gpt-5.4")
             self.assertEqual(loaded["token"], "env-token")
             self.assertEqual(loaded["timeout_seconds"], 90)

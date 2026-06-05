@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from worldpanel_qc.llm.reviewer import LlmReviewer, estimate_page_seconds_remaining
+from worldpanel_qc.llm.reviewer import LlmReviewer, dedupe_category_mismatch_issues, estimate_page_seconds_remaining
 
 
 class _Client:
@@ -87,6 +87,62 @@ class LlmReviewerTests(unittest.TestCase):
         self.assertEqual(result["issues"][0]["rule_id"], "llm_logic_review")
         self.assertEqual(result["issues"][0]["file_name"], "source.xlsx")
         self.assertEqual(result["ai_logs"][0]["status"], "success")
+
+    def test_accepts_top_level_issue_list_from_model_response(self):
+        client = _Client(
+            review_result={"ok": True, "status": "success", "data": [{"severity": "High", "description": "Suspicious value"}]},
+            document_result={"ok": True, "status": "success", "data": [{"severity": "Low", "description": "Minor note"}]},
+        )
+        reviewer = LlmReviewer(client, endpoint_host="llm.internal", ocr_enabled=False)
+        documents = [{"file_name": "source.xlsx", "file_type": "xlsx", "numbers": [{"value": 1000, "location": "Sheet1!A1"}], "texts": [], "pages": []}]
+
+        result = reviewer.review(documents, [{"file_name": "source.xlsx", "location": "Sheet1!A1"}], {}, Path("."))
+
+        self.assertEqual([issue["description"] for issue in result["issues"]], ["Suspicious value", "Minor note"])
+
+    def test_accepts_nested_issue_lists_and_text_items_from_model_response(self):
+        client = _Client(
+            review_result={
+                "ok": True,
+                "status": "success",
+                "data": {"issues": [[{"severity": "High", "description": "Nested issue"}], "Plain text issue"]},
+            },
+            document_result={"ok": True, "status": "success", "data": {"issues": []}},
+        )
+        reviewer = LlmReviewer(client, endpoint_host="llm.internal", ocr_enabled=False)
+
+        result = reviewer.review([], [{"file_name": "source.xlsx", "location": "Sheet1!A1"}], {}, Path("."))
+
+        self.assertEqual([issue["description"] for issue in result["issues"]], ["Nested issue", "Plain text issue"])
+
+    def test_category_template_mismatch_is_reported_once_at_run_level(self):
+        issues = dedupe_category_mismatch_issues(
+            [
+                {
+                    "rule_id": "llm_full_document_review",
+                    "severity": "Medium",
+                    "title": "Category mismatch",
+                    "description": "The file appears to be edible oil but the selected category template is fresh produce.",
+                    "evidence": "edible oil vs fresh produce template",
+                },
+                {
+                    "rule_id": "llm_visual_review",
+                    "severity": "Medium",
+                    "description": "品类和所选模板存在差异。",
+                    "evidence": "多个页面重复提示",
+                },
+                {
+                    "rule_id": "llm_full_document_review",
+                    "severity": "High",
+                    "description": "Share total is 92%.",
+                },
+            ]
+        )
+
+        self.assertEqual(len(issues), 2)
+        self.assertEqual(issues[0]["rule_id"], "llm_category_template_mismatch")
+        self.assertEqual(issues[0]["location"], "Run summary")
+        self.assertEqual(issues[1]["description"], "Share total is 92%.")
 
     def test_ocr_is_attempted_only_for_review_pages(self):
         client = _Client()

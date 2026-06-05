@@ -451,7 +451,17 @@ class Database:
 
     def list_issues(self, run_id: int) -> list[dict]:
         with closing(self.connect()) as conn:
-            rows = conn.execute("SELECT * FROM issues WHERE run_id=? ORDER BY CASE severity WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 ELSE 3 END, id", (run_id,)).fetchall()
+            rows = conn.execute(
+                """
+                SELECT * FROM issues
+                WHERE run_id=?
+                ORDER BY
+                    CASE WHEN rule_id='llm_category_template_mismatch' THEN 0 ELSE 1 END,
+                    CASE severity WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 ELSE 3 END,
+                    id
+                """,
+                (run_id,),
+            ).fetchall()
             return [dict(row) for row in rows]
 
     def list_coverage(self, run_id: int) -> list[dict]:

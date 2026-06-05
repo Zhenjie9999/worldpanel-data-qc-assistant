@@ -413,7 +413,13 @@ $("ruleForm").addEventListener("submit", async (event) => {
 $("runForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
-  const files = await Promise.all([...$("fileInput").files].map(readFile));
+  const selectedFiles = [...$("fileInput").files];
+  const hasSlides = selectedFiles.some((file) => /\.(pptx|ppt|pdf)$/i.test(file.name));
+  const hasWorkbook = selectedFiles.some((file) => /\.(xlsx|xls)$/i.test(file.name));
+  if (hasSlides && hasWorkbook && !window.confirm("This upload mixes PPT/PDF and Excel files. Please continue only when they belong to the same report package and need cross-checking.\n\n本次上传同时包含 PPT/PDF 和 Excel。请确认它们属于同一份报告/同一套交付文件，并且确实需要交叉检查。")) {
+    return;
+  }
+  const files = await Promise.all(selectedFiles.map(readFile));
   const submitButton = event.target.querySelector('[type="submit"]');
   submitButton.disabled = true;
   submitButton.textContent = "Uploading...";
