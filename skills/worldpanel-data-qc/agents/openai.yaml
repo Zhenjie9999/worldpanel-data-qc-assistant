@@ -1,0 +1,4 @@
+interface:
+  display_name: "Worldpanel Data QC"
+  short_description: "Check FMCG Excel, PPT, and PDF data with Worldpanel logic."
+  default_prompt: "Use $worldpanel-data-qc to inspect these Excel, PPT, or PDF files and produce a prioritized QC report."

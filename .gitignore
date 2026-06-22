@@ -19,6 +19,7 @@ qc_reports/
 *.ppt
 *.pdf
 *.zip
+!releases/worldpanel-data-qc-skill.zip
 
 # Logs
 *.log

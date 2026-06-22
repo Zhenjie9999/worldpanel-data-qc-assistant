@@ -134,6 +134,15 @@ Each QC run can enable two independent options:
 
 The configured model endpoint uses plain HTTP and must remain reachable from the backend computer. Public users access the application through HTTPS; browsers do not connect to the model endpoint directly. Before a permanent rollout, move the model endpoint to HTTPS and rotate the shared model credential.
 
+## Codex Skill
+
+The reusable Codex Skill is available here:
+
+- Download package: [`releases/worldpanel-data-qc-skill.zip`](releases/worldpanel-data-qc-skill.zip)
+- Source folder: [`skills/worldpanel-data-qc/`](skills/worldpanel-data-qc/)
+
+To install it manually, download and unzip the package, then place the `worldpanel-data-qc` folder under `~/.codex/skills/` (or `%USERPROFILE%\.codex\skills\` on Windows). In Codex, invoke it with `$worldpanel-data-qc` for Worldpanel FMCG Excel, PPT, and PDF data checks.
+
 ## Tests
 
 ```powershell
